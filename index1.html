@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Practical File Cover Generator</title>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  body{font-family:system-ui,sans-serif;background:#f1f5f9;margin:0;padding:16px}
+  .form{max-width:794px;margin:0 auto 16px;display:grid;gap:10px;grid-template-columns:1fr 1fr}
+  .form input,.form select{padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
+  .form .full,.form .custom{grid-column:1/-1}
+  .btns{max-width:794px;margin:0 auto 16px;display:flex;gap:10px}
+  button{flex:1;padding:12px;border:0;border-radius:8px;font-size:16px;color:#fff;background:#1e3a8a;cursor:pointer}
+  button.w{background:#2563eb}
+  .wrap{overflow-x:auto}
+  #page{width:794px;height:1123px;margin:0 auto;background:#fff;box-sizing:border-box;padding:60px 70px;text-align:center;font-family:Calibri,Arial,sans-serif;color:#000;position:relative}
+  #page .college{font-size:24px;line-height:1.3}
+  #page .dept{font-size:13px;margin-top:6px}
+  #page .pf{font-size:22px;margin-top:50px}
+  #page .of{font-size:20px;margin:25px 0}
+  #page .sub{font-size:38px;font-weight:700}
+  #page .code{font-size:26px;margin-top:6px}
+  #page img{width:438px;margin-top:80px}
+  /* bottom block: starts under logo, left col at x=105px, right col at x=468px */
+  #page .bottom{position:absolute;left:0;right:0;top:793px;padding-left:105px;display:grid;grid-template-columns:363px 1fr;text-align:left;font-size:22px;line-height:1.4}
+</style>
+</head>
+<body>
+
+<div class="form">
+  <select id="subject" class="full"></select>
+  <input id="cName" placeholder="Subject Name" class="custom">
+  <input id="cCode" placeholder="Paper Code (optional)" class="custom">
+  <input id="cProf" placeholder="Professor Name (e.g. Mr. Rahul Sharma)" class="custom">
+  <input id="cDesig" placeholder="Designation (optional) e.g. (Assistant Professor)" class="custom">
+  <input id="name" placeholder="Your Name" value="Yoyur">
+  <input id="roll" placeholder="Enrollment No." value="03715603123">
+  <input id="section" placeholder="Section" value="F5" class="full">
+</div>
+<div class="btns">
+  <button class="w" onclick="downloadWord()">Download Word</button>
+  <button onclick="downloadPDF()">Download PDF</button>
+</div>
+
+<div class="wrap">
+<div id="page">
+  <div class="college">Dr. Akhilesh Das Gupta Institute of Professional Studies<br>FC-26, Shastri Park, Shahdara, New Delhi-110053</div>
+  <div class="dept">DEPARTMENT OF INFORMATION TECHNOLOGY</div>
+  <div class="pf">PRACTICAL FILE</div>
+  <div class="of">OF</div>
+  <div class="sub" id="pSub"></div>
+  <div class="code" id="pCode"></div>
+  <img src="logo.png" alt="logo">
+  <div class="bottom">
+    <div><i>Submitted to:</i><br><b id="pProf"></b><br><span id="pDesig"></span><br>IT Department.</div>
+    <div><i>Submitted by:</i><br><span id="pName"></span><br><span id="pRoll"></span><br><span id="pSec"></span></div>
+  </div>
+</div>
+</div>
+
+<script>
+const SUBJECTS = [
+  {name:"Web Mining Lab", code:"CIE-431P", prof:"Ms. Isha", desig:"(Assistant Professor)"},
+  {name:"Blockchain Technology", code:"CIE-403P", prof:"Mr. Vedprakash Sharma", desig:"(Assistant Professor)"},
+  {name:"Reinforcement Learning and Deep Learning", code:"ML-409P", prof:"Ms. Arti", desig:""},
+  {name:"Pattern Recognition and Computer Vision", code:"ML-411P", prof:"Mr. Jogendra Kumar", desig:"(Assistant Professor)"},
+  {name:"Machine Learning", code:"CIE-421P", prof:"Mr. Jogendra Kumar", desig:"(Assistant Professor)"},
+];
+const $ = id => document.getElementById(id);
+SUBJECTS.forEach((s,i)=>$("subject").add(new Option(`${s.name} (${s.code})`, i)));
+$("subject").add(new Option("Other (custom subject / professor)", "other"));
+
+function data(){
+  const v = $("subject").value;
+  const s = v === "other"
+    ? {name:$("cName").value, code:$("cCode").value, prof:$("cProf").value, desig:$("cDesig").value}
+    : SUBJECTS[v];
+  return {...s, codeLine: s.code ? `(Paper code: ${s.code})` : "", uname:$("name").value, roll:$("roll").value, sec:$("section").value};
+}
+function render(){
+  document.querySelectorAll(".custom").forEach(e=>e.style.display = $("subject").value==="other" ? "" : "none");
+  const d = data();
+  $("pSub").textContent = d.name;
+  $("pCode").textContent = d.codeLine;
+  $("pProf").textContent = d.prof;
+  $("pDesig").textContent = d.desig;
+  $("pName").textContent = d.uname;
+  $("pRoll").textContent = d.roll;
+  $("pSec").textContent = "Section: " + d.sec;
+}
+document.querySelectorAll("select,input").forEach(e=>e.addEventListener("input",render));
+render();
+
+const fname = ext => `${data().name} - ${data().uname}.${ext}`;
+
+function downloadPDF(){
+  html2pdf().set({
+    margin:0, filename:fname("pdf"),
+    html2canvas:{scale:2, useCORS:true},
+    jsPDF:{unit:"px", format:[794,1123], orientation:"portrait", hotfixes:["px_scaling"]}
+  }).from($("page")).save();
+}
+
+async function downloadWord(){
+  const {Document,Packer,Paragraph,TextRun,ImageRun,AlignmentType,Table,TableRow,TableCell,WidthType,BorderStyle} = docx;
+  const d = data();
+  const C = AlignmentType.CENTER, L = AlignmentType.LEFT;
+  const p = (text,{size=12,bold=false,italics=false,align=C,before=0,after=0,ind=0}={}) =>
+    new Paragraph({alignment:align, spacing:{before,after}, indent:{left:ind}, children:[new TextRun({text,size:size*2,bold,italics,font:"Calibri"})]});
+  const none = {style:BorderStyle.NONE,size:0,color:"FFFFFF"};
+  const borders = {top:none,bottom:none,left:none,right:none};
+
+  // logo with correct aspect ratio
+  const blob = await fetch("logo.png").then(r=>r.blob());
+  const bmp = await createImageBitmap(blob);
+  const lw = 430, lh = Math.round(lw * bmp.height / bmp.width);
+  const logo = await blob.arrayBuffer();
+
+  const top = [
+    p("Dr. Akhilesh Das Gupta Institute of Professional Studies",{size:16}),
+    p("FC-26, Shastri Park, Shahdara, New Delhi-110053",{size:16}),
+    p("DEPARTMENT OF INFORMATION TECHNOLOGY",{size:9,before:100}),
+    p("PRACTICAL FILE",{size:14,before:700}),
+    p("OF",{size:14,before:450}),
+    p(d.name,{size:26,bold:true,before:350}),
+    p(d.codeLine,{size:16,before:100}),
+    new Paragraph({alignment:C, spacing:{before:700}, children:[new ImageRun({data:logo, transformation:{width:lw, height:lh}})]})
+  ];
+
+  const left = [p("Submitted to:",{size:14,italics:true,align:L,before:1300,ind:420}), p(d.prof,{size:14,bold:true,align:L,ind:420})];
+  if(d.desig) left.push(p(d.desig,{size:14,align:L,ind:420}));
+  left.push(p("IT Department.",{size:14,align:L,ind:420}));
+  const right = [
+    p("Submitted by:",{size:14,italics:true,align:L,before:1300}), p(d.uname,{size:14,align:L}),
+    p(d.roll,{size:14,align:L}), p("Section: "+d.sec,{size:14,align:L})
+  ];
+
+  const W = 9638, W1 = 5890; // A4 width 11906 - 2*1134 margins (twips)
+  const cell = (children, w, extra={}) => new TableCell({borders, width:{size:w,type:WidthType.DXA}, children, ...extra});
+
+  const table = new Table({
+    width:{size:W,type:WidthType.DXA},
+    columnWidths:[W1, W-W1],
+    borders:{...borders, insideHorizontal:none, insideVertical:none},
+    rows:[
+      new TableRow({children:[cell(top, W, {columnSpan:2})]}),
+      new TableRow({children:[cell(left, W1), cell(right, W-W1)]})
+    ]
+  });
+
+  const doc = new Document({sections:[{
+    properties:{page:{size:{width:11906,height:16838}, margin:{top:1134,bottom:1134,left:1134,right:1134}}},
+    children:[table]
+  }]});
+
+  const out = await Packer.toBlob(doc);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(out);
+  a.download = fname("docx");
+  a.click();
+}
+</script>
+</body>
+</html>
